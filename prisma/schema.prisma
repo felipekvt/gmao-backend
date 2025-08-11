@@ -1,0 +1,165 @@
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+model User {
+  id           Int      @id @default(autoincrement())
+  name         String
+  email        String   @unique
+  passwordHash String
+  role         Role     @default(TECNICO)
+  createdAt    DateTime @default(now())
+  workLogs     WorkLog[]
+  comments     Comment[]
+}
+
+enum Role {
+  ADMIN
+  PLANEJADOR
+  TECNICO
+  VISUALIZADOR
+}
+
+model Asset {
+  id          Int       @id @default(autoincrement())
+  name        String
+  code        String    @unique
+  parentId    Int?
+  parent      Asset?    @relation("AssetHierarchy", fields: [parentId], references: [id])
+  children    Asset[]   @relation("AssetHierarchy")
+  location    String?
+  criticality Int       @default(3)
+  createdAt   DateTime  @default(now())
+  plans       MaintenancePlan[]
+  workOrders  WorkOrder[]
+}
+
+model MaintenancePlan {
+  id              Int       @id @default(autoincrement())
+  assetId         Int
+  asset           Asset     @relation(fields: [assetId], references: [id])
+  title           String
+  type            PlanType  @default(TEMPO)
+  everyN          Int
+  unit            PlanUnit  @default(DIA)
+  lastGeneratedAt DateTime?
+  isActive        Boolean   @default(true)
+  workOrders      WorkOrder[]
+}
+
+enum PlanType {
+  TEMPO
+  MEDICAO
+}
+
+enum PlanUnit {
+  DIA
+  SEMANA
+  MES
+  HORA
+}
+
+model WorkOrder {
+  id           Int       @id @default(autoincrement())
+  code         String    @unique
+  type         WOType    @default(PM01)
+  assetId      Int
+  asset        Asset     @relation(fields: [assetId], references: [id])
+  planId       Int?
+  plan         MaintenancePlan? @relation(fields: [planId], references: [id])
+  status       WOStatus  @default(ABERTA)
+  priority     Int       @default(3)
+  description  String?
+  plannedStart DateTime?
+  plannedEnd   DateTime?
+  closedAt     DateTime?
+  createdById  Int?
+  assignedToId Int?
+  workLogs     WorkLog[]
+  womaterials  WorkOrderMaterial[]
+  comments     Comment[]
+  checklist    Checklist[]
+  createdAt    DateTime @default(now())
+}
+
+enum WOType {
+  PM01
+  PM02
+}
+
+enum WOStatus {
+  ABERTA
+  EM_EXECUCAO
+  CONCLUIDA
+  CANCELADA
+}
+
+model WorkLog {
+  id          Int      @id @default(autoincrement())
+  workOrderId Int
+  userId      Int
+  hours       Float
+  notes       String?
+  createdAt   DateTime @default(now())
+  workOrder   WorkOrder @relation(fields: [workOrderId], references: [id])
+  user        User     @relation(fields: [userId], references: [id])
+}
+
+model Material {
+  id         Int      @id @default(autoincrement())
+  sku        String   @unique
+  name       String
+  uom        String   @default("UN")
+  qtyOnHand  Float    @default(0)
+  avgCost    Float    @default(0)
+  womaterials WorkOrderMaterial[]
+}
+
+model WorkOrderMaterial {
+  id          Int @id @default(autoincrement())
+  workOrderId Int
+  materialId  Int
+  qty         Float
+  unitCost    Float
+  workOrder   WorkOrder @relation(fields: [workOrderId], references: [id])
+  material    Material  @relation(fields: [materialId], references: [id])
+}
+
+model Checklist {
+  id          Int @id @default(autoincrement())
+  workOrderId Int
+  title       String
+  items       ChecklistItem[]
+  workOrder   WorkOrder @relation(fields: [workOrderId], references: [id])
+}
+
+model ChecklistItem {
+  id          Int @id @default(autoincrement())
+  checklistId Int
+  text        String
+  result      Result @default(NA)
+  note        String?
+  checklist   Checklist @relation(fields: [checklistId], references: [id])
+}
+
+enum Result {
+  OK
+  NOK
+  NA
+}
+
+model Comment {
+  id          Int @id @default(autoincrement())
+  workOrderId Int
+  userId      Int
+  text        String
+  createdAt   DateTime @default(now())
+  workOrder   WorkOrder @relation(fields: [workOrderId], references: [id])
+  user        User     @relation(fields: [userId], references: [id])
+}
